@@ -5,10 +5,12 @@ vid.framesPerTrigger = num_images;
 set(vid,'LoggingMode','disk');
 avi = VideoWriter('./physlock/video/training.avi');
 set(vid,'DiskLogger',avi);
+disp('Video capture starting');
 start(vid);
 wait(vid,Inf);
 avi = get(vid,'DiskLogger');
 close(avi);
+disp('Video capture over');
 delete(vid);
 clear vid;
 
