@@ -6,7 +6,7 @@ set(vid,'LoggingMode','disk');
 avi = VideoWriter('./physlock/video/training.avi');
 set(vid,'DiskLogger',avi);
 start(vid);
-wait(vid,Inf); 
+wait(vid,Inf);
 avi = get(vid,'DiskLogger');
 close(avi);
 delete(vid);
@@ -16,7 +16,7 @@ clear vid;
 vid=VideoReader('./physlock/video/training.avi');
 numFrames = vid.NumberOfFrames;
 n=numFrames;
-for i = 1:2:n
+for i = 1:1:n
     frame = read(vid,i);
     frame = imresize(frame, 0.125);
     imwrite(frame,['./physlock/images/Image' int2str(i), '.jpg']);
