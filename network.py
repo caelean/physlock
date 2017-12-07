@@ -2,10 +2,11 @@ import tensorflow as tf
 import pandas as pd
 import numpy as np
 
-DATA_FILE = "/Users/evanmdoyle/Programming/PervasiveComputing/LabProject/Data/images.csv"
+DATA_FILE = "Data/data.csv"
 EVAL_FILE = DATA_FILE
-MODEL_DIR = "/Users/evanmdoyle/Programming/PervasiveComputing/LabProject/Model/"
-EXPORT_DIR = "/Users/evanmdoyle/Programming/PervasiveComputing/LabProject/Export/"
+MODEL_DIR = "Model/"
+EXPORT_DIR = "Export/"
+
 #TODO: Fill in correct image size
 IMAGE_HEIGHT = 160
 IMAGE_WIDTH = 90
