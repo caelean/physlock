@@ -1,9 +1,27 @@
 from PIL import Image
 import numpy
 import os
+import sys
 
-file = open('data.csv', 'w')
-indir = './images/'
+'''
+	'Python JPGtoCSV.py -t' : process training data in /images
+	'Python JPGtoCSV.py -j' : process junk data in /images
+	'Python JPGtoCSV.py -v' : process image to be verified in /test
+'''
+
+indir = 'images/'
+fname = 'csv/data.csv'
+# process junk data
+label = '0'
+# process training data
+if sys.argv[1] == '-t':
+	label = '1'
+# verify image
+elif sys.argv[1] == '-v':
+	indir = 'test/'
+	fname = 'csv/verify.csv'
+
+file = open(fname, 'w')
 for _, __, filenames in os.walk(indir):
 	for f in filenames:
 		if f[-3:] == 'jpg':
@@ -18,6 +36,6 @@ for _, __, filenames in os.walk(indir):
 						elif value < 100:
 							ans += '0'
 						ans += str(value) + ','
-			ans += '1\n'
+			ans += label + '\n'
 			file.write(ans)
 file.close()
