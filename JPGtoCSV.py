@@ -2,7 +2,7 @@ from PIL import Image
 import numpy
 import os
 
-file = open('data.csv', 'w')
+file = open('Data/data.csv', 'w')
 indir = './images/'
 for _, __, filenames in os.walk(indir):
 	for f in filenames:
