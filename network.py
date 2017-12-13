@@ -28,13 +28,9 @@ MANIPULATIONS = 10
 
 STRIDE = [1,1,1,1]
 
-def input_fn(train=True, batch_size=6, num_epochs=1, shuffle=False, seed=42):
+def input_fn(train=True, batch_size=1, num_epochs=1, shuffle=False, seed=42):
 	positive_example_filenames = os.listdir(TRAIN_KEY_DIR) if train else os.listdir(EVAL_KEY_DIR)
-	print("Positive files: ")
-	print(positive_example_filenames)
 	negative_example_filenames = os.listdir(TRAIN_NONKEY_DIR) if train else os.listdir(EVAL_NONKEY_DIR)
-	print("Negative files: ")
-	print(negative_example_filenames)
 
 	positive_example_filenames = [x for x in positive_example_filenames if x != '.DS_Store']
 	negative_example_filenames = [x for x in negative_example_filenames if x != '.DS_Store']
@@ -52,6 +48,8 @@ def input_fn(train=True, batch_size=6, num_epochs=1, shuffle=False, seed=42):
 		image = tf.convert_to_tensor(sp.ndimage.imread(curr_dir+filename))
 		image = tf.cast(image, tf.int32)
 		image = tf.cast(image, tf.float32)
+
+		# This resizes the images using 
 		resized_image = tf.image.resize_images(image, [IMAGE_HEIGHT, IMAGE_WIDTH])
 		manipulated_images = [ tf.constant(0) for i in range(MANIPULATIONS) ]
 		for i in range(MANIPULATIONS):
@@ -124,8 +122,6 @@ def model_fn(features, labels, mode, params):
 		'accuracy': tf.metrics.accuracy(labels=labels, predictions=tf.round(output_layer))
 	}
 
-	# global_step = tf.Variable(0, trainable=False)
-	# TODO: Match the specs in the paper about learning rate decay
 	learning_rate = tf.train.exponential_decay(0.01, tf.train.get_global_step(),
 									   10000, 0.96, staircase=True)
 
@@ -154,9 +150,9 @@ def build_estimator():
 
 def main():
 	estimator = build_estimator()
-	estimator.train(input_fn=lambda: input_fn(), steps=10)
-	print(estimator.evaluate(input_fn=lambda: input_fn(train=False), steps=1))
-	export(estimator)
+	# estimator.train(input_fn=lambda: input_fn(), steps=20)
+	print(estimator.evaluate(input_fn=lambda: input_fn(train=False), steps=4))
+	# export(estimator)
 
 if __name__=='__main__':
 	main()

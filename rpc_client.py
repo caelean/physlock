@@ -51,7 +51,7 @@ class PredictClient():
             result = stub.Predict(request, timeout=request_timeout)
             print('Success')
             print(result.outputs)
-            return list(result.outputs[signature_name].float_val)
+            return list(result.outputs['prediction'].float_val)
         except RpcError as e:
             print('Error')
             logger.error(e)
