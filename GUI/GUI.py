@@ -2,6 +2,8 @@ import os
 import errno
 from cv2 import *
 import tkMessageBox
+import numpy
+from rpc_client import PredictClient
 
 # RELATIVE PATH TO THE DIRECTORY
 fileDir = os.path.dirname(os.path.realpath('__file__'))
@@ -13,7 +15,11 @@ def start_cam():
     # INDEX 0 FOR WEBCAM AND 1 FOR USB WEBCAM.
     cam = cv2.VideoCapture(0)
     # FUNCTION TO TAKE A SCREEN_SHOT
-    take_screen_shot(cam, cv2)
+    answer = take_screen_shot(cam, cv2)
+    if answer > 0.5:
+        pop_window("CONGRATS," "THE LOCK HAS BEEN UNLOCKED")
+    elif answer <= 0.5:
+        pop_window("SORRY", "THAT IS NOT THE KEY")
     # RELEASE IMAGE
     destroy_cam(cam, cv2)
 
@@ -58,8 +64,26 @@ def take_screen_shot(cam, cv2):
             #print resized_image
             # DEFAULT IMAGES ARE (BGR) FORMAT IN OPENCV SO WE NEED TO CHANGE THE ORDER TO RGB BEFORE SENDING IT.
             b, g, r = cv2.split(resized_image)
+            print "blue"
+            print b
+            print "green"
+            print g
+            print "red"
+            print r
             # MERGE NEW ORDER (RGB)
             resized_image = cv2.merge((r, g, b))
+            print "old"
+            print resized_image
+            # TRANSFORM THE
+            new_resized_image = numpy.array(resized_image)
+            # COULD BE USING .T.
+            flattened_image = new_resized_image.flatten()
+            print "new"
+            print flattened_image
+            client = PredictClient('127.0.0.1', 9000, 'physlock', 1513186008)
+            answer = client.predict(flattened_image)['prediction'].float_value
+            return answer
+
 # FOR DEBUGGING
 #print "new one"
 #print resized_image
