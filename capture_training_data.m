@@ -10,19 +10,47 @@ start(vid);
 wait(vid,Inf);
 avi = get(vid,'DiskLogger');
 close(avi);
-disp('Video capture over');
 delete(vid);
 clear vid;
-
+disp('Video capture over');
 
 vid=VideoReader('./physlock/video/training.avi');
 numFrames = vid.NumberOfFrames;
 n=numFrames;
+disp('Writing data');
+data = [];
 for i = 1:1:n
     frame = read(vid,i);
-    frame = imresize(frame, 0.125);
-    imwrite(frame,['./physlock/images/image' int2str(i), '.jpg']);
+    frame = rgb2gray(frame); % converts image to grayscale
+    level = graythresh(frame); % calculates graythresh level
+    frame = im2bw(frame,level); % converts image to black and white
+    frame = imcomplement(frame); % complements image
+    frame = imclose(frame,strel('disk',6));
+    [labels,numlabels]=bwlabel(frame); % creates labels
+    stats = regionprops(labels, 'all'); % calculate statistics
+    if i % 30 == 0
+        imshow(frame);
+    end
+    if length(stats) > 1
+        frame = imclose(frame,strel('disk',4));
+        [labels,numlabels]=bwlabel(frame); % creates labels
+        stats = regionprops(labels, 'all'); % calculate statistics
+        if length(stats) > 1
+            disp("invalid number: " + length(stats));
+            continue;
+        end
+    end
+    [labels,numlabels]=bwlabel(frame); % creates labels
+    stats = regionprops(labels, 'all'); % calculate statistics
+    f = zeros(length(stats)); % This initializes the f vector
+    elm = stats(1);
+    ff = 4*pi*elm.Area/((elm.Perimeter)^2); % This calculates the form factor
+    data = [data; (ff) elm.Area elm.Perimeter 3];
     im(i)=image(frame);
+    
 end
+disp(data);
+dlmwrite("data.csv",data,'-append','precision','%.3f');
 delete(vid);
 clear vid;
+disp('Finished');
