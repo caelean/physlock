@@ -18,18 +18,21 @@ def start_cam():
     destroy_cam(cam, cv2)
 
 
+# FUNCTION TO DISPLAY THE MESSAGE
 def pop_window(title, message):
     tkMessageBox.showinfo(title, message)
 
 
+# FUNCTION TO TAKE A SCREENSHOT
 def take_screen_shot(cam, cv2):
     # WHILE LOOP TO KEEP RUNNING THE FRAMES
     while True:
         ret, frame = cam.read()
         # RESIZE THE IMAGE FRAME
         resized_image = cv2.resize(frame, (160, 90)) #resize the image frame
-        #DISPLAY THE IMAGE
+        # WINDOW NAME
         window_name = "TAKE A SCREEN SHOT"
+        # DISPLAY THE IMAGE
         cv2.imshow(window_name, frame)
         # MOVE THE WINDOW TO THE CENTER
         cv2.moveWindow(window_name, 100, 0)
@@ -49,10 +52,20 @@ def take_screen_shot(cam, cv2):
         elif k % 256 == 32:
             # IMAGE NAME
             img_name = "picture.jpg"
-            # WRITE IMAGE TO RELATIVE PATH
+            # WRITE/SAVE IMAGE TO RELATIVE PATH
             cv2.imwrite(os.path.join(filename, img_name), resized_image)
+            # FOR DEBUGGING
+            #print resized_image
+            # DEFAULT IMAGES ARE (BGR) FORMAT IN OPENCV SO WE NEED TO CHANGE THE ORDER TO RGB BEFORE SENDING IT.
+            b, g, r = cv2.split(resized_image)
+            # MERGE NEW ORDER (RGB)
+            resized_image = cv2.merge((r, g, b))
+# FOR DEBUGGING
+#print "new one"
+#print resized_image
 
 
+# STOP CAMERA AND REMOVE WINDOWS
 def destroy_cam(cam, cv2):
     cam.release()
     cv2.destroyAllWindows()
