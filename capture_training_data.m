@@ -40,17 +40,15 @@ for i = 1:1:n
             continue;
         end
     end
-    [labels,numlabels]=bwlabel(frame); % creates labels
-    stats = regionprops(labels, 'all'); % calculate statistics
     f = zeros(length(stats)); % This initializes the f vector
     elm = stats(1);
     ff = 4*pi*elm.Area/((elm.Perimeter)^2); % This calculates the form factor
-    data = [data; (ff) elm.Area elm.Perimeter 3];
+    data = [data; (ff) elm.Area elm.Perimeter];
     im(i)=image(frame);
     
 end
-disp(data);
 dlmwrite("data.csv",data,'-append','precision','%.3f');
+disp(data);
 delete(vid);
 clear vid;
 disp('Finished');
