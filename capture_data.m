@@ -1,4 +1,4 @@
-function capture_data(frame)
+function data = capture_data(frame)
 
 % vid = videoinput ('macvideo',2);
 % frame = getsnapshot(vid);
@@ -23,4 +23,3 @@ f = zeros(length(stats)); % This initializes the f vector
 elm = stats(1);
 ff = 4*pi*elm.Area/((elm.Perimeter)^2); % This calculates the form factor
 data = [ff elm.Area elm.Perimeter];
-disp(data);
