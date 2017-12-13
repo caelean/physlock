@@ -1,15 +1,21 @@
 import tensorflow as tf
-import pandas as pd
 import numpy as np
+import os
+import random
+import scipy as sp
 
-DATA_FILE = "Data/data.csv"
-EVAL_FILE = DATA_FILE
+DATA_DIR = "Data/"
+TRAIN_DIR = DATA_DIR + "Train/"
+EVAL_DIR = DATA_DIR + "Eval/"
+TRAIN_KEY_DIR = TRAIN_DIR + "Key/"
+TRAIN_NONKEY_DIR = TRAIN_DIR + "Non-Key/"
+EVAL_KEY_DIR = EVAL_DIR + "Key/"
+EVAL_NONKEY_DIR = EVAL_DIR + "Non-Key/"
 MODEL_DIR = "Model/"
 EXPORT_DIR = "Export/"
 
-#TODO: Fill in correct image size
-IMAGE_HEIGHT = 160
-IMAGE_WIDTH = 90
+IMAGE_HEIGHT = 90
+IMAGE_WIDTH = 160
 IMAGE_SIZE = IMAGE_HEIGHT*IMAGE_WIDTH
 
 FILTER_HEIGHT = 3
@@ -18,39 +24,68 @@ FILTER_WIDTH = 3
 IN_CHANNELS = 3
 OUT_CHANNELS = 1
 
+MANIPULATIONS = 10
+
 STRIDE = [1,1,1,1]
 
-def feature_col_names():
-	return [str(x) for x in range(IMAGE_SIZE*IN_CHANNELS)]
+def input_fn(train=True, batch_size=1, num_epochs=1, shuffle=False, seed=42):
+	positive_example_filenames = os.listdir(TRAIN_KEY_DIR) if train else os.listdir(EVAL_KEY_DIR)
+	negative_example_filenames = os.listdir(TRAIN_NONKEY_DIR) if train else os.listdir(EVAL_NONKEY_DIR)
 
-def input_fn(data_file, num_epochs, batch_size=10, shuffle=False, num_threads=1):
-	feature_cols = feature_col_names()
-	target_cols = ['label']
-	dataset = pd.read_csv(
-		tf.gfile.Open(data_file),
-		header=0,
-		usecols=feature_cols + target_cols,
-		skipinitialspace=True,
-		engine="python")
-	# Drop NaN entries
-	dataset.dropna(how="any", axis=0)
+	positive_example_filenames = [x for x in positive_example_filenames if x != '.DS_Store']
+	negative_example_filenames = [x for x in negative_example_filenames if x != '.DS_Store']
 
-	labels = dataset.label
-	dataset.pop('label')
+	all_labels = tf.concat([tf.cast(tf.ones([(1+MANIPULATIONS)*len(positive_example_filenames)]), tf.int32),
+		tf.cast(tf.zeros((1+MANIPULATIONS)*len(negative_example_filenames)), tf.int32)], 0)
 
-	return tf.estimator.inputs.numpy_input_fn(
-		x={"x": np.array(dataset)},
-		y=np.array(labels),
-		batch_size=batch_size,
-		num_epochs=num_epochs,
-		shuffle=shuffle,
-		num_threads=num_threads)
+	all_images = []
+
+	for filename in positive_example_filenames + negative_example_filenames:
+		if filename in positive_example_filenames:
+			curr_dir = TRAIN_KEY_DIR if train else EVAL_KEY_DIR
+		else:
+			curr_dir = TRAIN_NONKEY_DIR if train else EVAL_NONKEY_DIR
+		image = tf.convert_to_tensor(sp.ndimage.imread(curr_dir+filename))
+		image = tf.cast(image, tf.int32)
+		image = tf.cast(image, tf.float32)
+
+		# This resizes the images using 
+		resized_image = tf.image.resize_images(image, [IMAGE_HEIGHT, IMAGE_WIDTH])
+		manipulated_images = [ tf.constant(0) for i in range(MANIPULATIONS) ]
+		for i in range(MANIPULATIONS):
+			r_num = random.randint(1,3)
+			if r_num == 1:
+				manipulated_images[i] = tf.image.random_flip_up_down(resized_image)
+			elif r_num == 2:
+				manipulated_images[i] = tf.image.random_flip_left_right(resized_image)
+			# Transpose screws up dimensions
+			# elif r_num == 3:
+			# 	manipulated_images[i] = tf.image.transpose_image(resized_image)
+			else:
+				num_rots = random.randint(0,1)
+				manipulated_images[i] = tf.image.rot90(resized_image, k=num_rots*2)
+		all_images += [resized_image] + manipulated_images
+
+	images, labels = tf.train.slice_input_producer( [all_images, all_labels], 
+                                                num_epochs=num_epochs,
+                                                shuffle=shuffle, seed=seed,
+                                                capacity=32,
+                                              )
+
+	feature_cols = dict(images=images, labels=labels)
+	batched_cols = tf.train.batch(feature_cols, batch_size)
+
+	batched_labels = batched_cols.pop('labels')
+
+	return batched_cols, batched_labels
+
+
 
 def model_fn(features, labels, mode, params):
 
 	# Input layer comes from features, which come from input_fn
-	input_layer = tf.cast(features["x"], tf.float32)
-	image = tf.reshape(input_layer, [-1,IMAGE_HEIGHT,IMAGE_WIDTH,IN_CHANNELS])
+	# input_layer = tf.cast(features["x"], tf.float32)
+	image = tf.reshape(features['images'], [-1,IMAGE_HEIGHT,IMAGE_WIDTH,IN_CHANNELS])
 
 	name = "Name"
 	kernel = tf.get_variable(
@@ -79,15 +114,14 @@ def model_fn(features, labels, mode, params):
 
 	# TODO: add l2 regularization
 	loss = tf.reduce_mean(
-		tf.nn.softmax_cross_entropy_with_logits(logits=tf.transpose(output_layer), labels=labels)
+		tf.nn.sigmoid_cross_entropy_with_logits(
+			logits=output_layer, labels=tf.cast(tf.reshape(labels, [-1, 1]), tf.float32))
 	)
 
 	eval_metric_ops = {
 		'accuracy': tf.metrics.accuracy(labels=labels, predictions=tf.round(output_layer))
 	}
 
-	# global_step = tf.Variable(0, trainable=False)
-	# TODO: Match the specs in the paper about learning rate decay
 	learning_rate = tf.train.exponential_decay(0.01, tf.train.get_global_step(),
 									   10000, 0.96, staircase=True)
 
@@ -108,7 +142,7 @@ def model_fn(features, labels, mode, params):
 
 def export(estimator):
 	serving_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
-			features={'x': tf.placeholder(tf.float32, shape=[1, IMAGE_SIZE*IN_CHANNELS])})
+			features={'images': tf.placeholder(tf.float32, shape=[1, IMAGE_SIZE*IN_CHANNELS])})
 	estimator.export_savedmodel(EXPORT_DIR, serving_fn)
 
 def build_estimator():
@@ -116,9 +150,9 @@ def build_estimator():
 
 def main():
 	estimator = build_estimator()
-	estimator.train(input_fn=input_fn(DATA_FILE, num_epochs=None, shuffle=True), steps=2)
-	print(estimator.evaluate(input_fn=input_fn(EVAL_FILE, num_epochs=None, shuffle=False), steps=1))
-	export(estimator)
+	# estimator.train(input_fn=lambda: input_fn(), steps=20)
+	print(estimator.evaluate(input_fn=lambda: input_fn(train=False), steps=4))
+	# export(estimator)
 
 if __name__=='__main__':
 	main()
