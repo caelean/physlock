@@ -3,23 +3,34 @@ import errno
 from cv2 import *
 import tkMessageBox
 import numpy
+import matlab
+import matlab.engine as engine
 from rpc_client import PredictClient
+
+CHOSEN_KEY = 2
+THRESHOLD = 5.5
 
 # RELATIVE PATH TO THE DIRECTORY
 fileDir = os.path.dirname(os.path.realpath('__file__'))
 # NEW SECRET FOLDER
-filename = os.path.join(fileDir + '/New_secret_pic')
+filename = os.path.join(fileDir)
+
+unlocked = False
 
 
 def start_cam():
     # INDEX 0 FOR WEBCAM AND 1 FOR USB WEBCAM.
     cam = cv2.VideoCapture(1)
     # FUNCTION TO TAKE A SCREEN_SHOT
-    answer = take_screen_shot(cam, cv2)
-    if answer > 0.5:
-        pop_window("CONGRATS", "THE LOCK HAS BEEN UNLOCKED")
-    elif answer <= 0.5:
-        pop_window("SORRY", "THAT IS NOT THE KEY")
+    while True:
+        answer = take_screen_shot(cam, cv2)
+        print answer
+        if answer == CHOSEN_KEY:
+            pop_window("CONGRATS", "THE LOCK HAS BEEN UNLOCKED")
+            unlocked = True
+        else:
+            pop_window("SORRY", "THAT IS NOT THE KEY")
+            unlocked = False
     # RELEASE IMAGE
     destroy_cam(cam, cv2)
 
@@ -29,13 +40,31 @@ def pop_window(title, message):
     tkMessageBox.showinfo(title, message)
 
 
+# FUNCTION TO READ MEAN AND STANDARD DEVIATION OF OUR DATA
+def read_mean_std():
+    with open('mean_std.txt') as f:
+        lines = f.readlines()
+        means = lines[0].split(',')
+        stds = lines[1].split(',')
+    return means, stds
+
+# FUNCTION TO NORMALIZE DATA TO STANDARD DEVIATIONS FROM MEAN
+def normalize(data):
+    means, stds = read_mean_std()
+    for i in range(3):
+        data[i] = (data[i] - float(means[i]))/float(stds[i])
+    return data
+
+# FUNCTION TO REMOVE DATA PAST A THRESHOLD OF
+# STANDARD DEVIATIONS FROM MEAN (SIGNIFICANT OUTLIER)
+def screen(data):
+    return sum([abs(i) for i in data]) <= THRESHOLD
+
 # FUNCTION TO TAKE A SCREENSHOT
 def take_screen_shot(cam, cv2):
     # WHILE LOOP TO KEEP RUNNING THE FRAMES
     while True:
         ret, frame = cam.read()
-        # RESIZE THE IMAGE FRAME
-        resized_image = cv2.resize(frame, (160, 90)) #resize the image frame
         # WINDOW NAME
         window_name = "TAKE A SCREEN SHOT"
         # DISPLAY THE IMAGE
@@ -57,36 +86,21 @@ def take_screen_shot(cam, cv2):
         # SPACE PRESSED
         elif k % 256 == 32:
             # IMAGE NAME
-            img_name = "picture.jpg"
+            img_name = "test.jpg"
             # WRITE/SAVE IMAGE TO RELATIVE PATH
-            cv2.imwrite(os.path.join(filename, img_name), resized_image)
-            # FOR DEBUGGING
-            #print resized_image
-            # DEFAULT IMAGES ARE (BGR) FORMAT IN OPENCV SO WE NEED TO CHANGE THE ORDER TO RGB BEFORE SENDING IT.
-            b, g, r = cv2.split(resized_image)
-            print "blue"
-            print b
-            print "green"
-            print g
-            print "red"
-            print r
-            # MERGE NEW ORDER (RGB)
-            resized_image = cv2.merge((r, g, b))
-            print "old"
-            print resized_image
-            # TRANSFORM THE
-            new_resized_image = numpy.array(resized_image)
-            # COULD BE USING .T.
-            flattened_image = new_resized_image.T.flatten()
-            print "new"
-            print flattened_image
-            client = PredictClient('127.0.0.1', 9000, 'physlock', 1513188710)
-            answer = client.predict(flattened_image)[0]
+            cv2.imwrite(os.path.join(filename, img_name), frame)
+            # CALL MATLAB IMAGE FEATURE EXTRACT SCRIPT
+            eng = engine.start_matlab()
+            data = eng.capture_data()[0]
+            # USE MEAN NORMALIZATION TO AID NN TRAINING
+            data = normalize(data)
+            # SCREEN OUT OUTLIER DATA BASED ON STANDARD DEVIATIONS
+            if(not screen(data)):
+                return -1
+            # CONNECT TO MODEL ON LOCAL HOST
+            client = PredictClient('127.0.0.1', 9000, 'physlock', 1513238173)
+            answer = client.predict([float(i) for i in data])[0]
             return answer
-
-# FOR DEBUGGING
-#print "new one"
-#print resized_image
 
 
 # STOP CAMERA AND REMOVE WINDOWS
