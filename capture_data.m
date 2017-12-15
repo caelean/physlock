@@ -4,6 +4,7 @@ function data = capture_data()
 % frame = getsnapshot(vid);
 % delete(vid);
 % clear vid;
+
 frame = imread('test.jpg');
 frame = rgb2gray(frame); % converts image to grayscale
 level = graythresh(frame); % calculates graythresh level
