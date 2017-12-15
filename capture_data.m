@@ -1,6 +1,6 @@
 function data = capture_data()
 
-frame = imread('image.jpg');
+frame = imread('test.jpg');
 frame = rgb2gray(frame); % converts image to grayscale
 level = graythresh(frame); % calculates graythresh level
 frame = im2bw(frame,level); % converts image to black and white
